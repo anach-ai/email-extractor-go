@@ -450,8 +450,9 @@ func (e *EmailExtractor) initializeDNSResolver() {
 	e.dnsCacheExpiry = make(map[string]time.Time)
 }
 
-// fastDNSCheck performs a quick DNS lookup to verify if domain exists (cached)
+// fastDNSCheck performs a DNS lookup to verify if domain exists (cached, with retry logic)
 // Returns true if domain has valid DNS, false otherwise
+// Uses 12-second timeout and retries up to 3 times for better reliability
 func (e *EmailExtractor) fastDNSCheck(domain string) bool {
 	// Check cache first
 	e.dnsCacheMutex.RLock()
@@ -464,36 +465,80 @@ func (e *EmailExtractor) fastDNSCheck(domain string) bool {
 	}
 	e.dnsCacheMutex.RUnlock()
 
-	// Perform DNS lookup with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
+	// DNS lookup with retry logic (3 attempts with exponential backoff)
+	maxRetries := 3
+	dnsTimeout := 12 * time.Second // Increased from 2 seconds to 12 seconds
 
-	var hasDNS bool
-	done := make(chan bool, 1)
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		// Perform DNS lookup with timeout
+		ctx, cancel := context.WithTimeout(context.Background(), dnsTimeout)
 
-	go func() {
-		// Try to resolve domain using custom resolver
-		_, err := e.dnsResolver.LookupHost(ctx, domain)
-		hasDNS = (err == nil)
-		done <- true
-	}()
+		var hasDNS bool
+		var dnsErr error
+		done := make(chan bool, 1)
 
-	select {
-	case <-done:
-		// Cache the result for 24 hours
-		e.dnsCacheMutex.Lock()
-		e.dnsCache[domain] = hasDNS
-		e.dnsCacheExpiry[domain] = time.Now().Add(24 * time.Hour)
-		e.dnsCacheMutex.Unlock()
-		return hasDNS
-	case <-ctx.Done():
-		// Timeout - assume no DNS
-		e.dnsCacheMutex.Lock()
-		e.dnsCache[domain] = false
-		e.dnsCacheExpiry[domain] = time.Now().Add(1 * time.Hour) // Shorter cache for failures
-		e.dnsCacheMutex.Unlock()
-		return false
+		go func() {
+			// Try to resolve domain using custom resolver
+			_, dnsErr = e.dnsResolver.LookupHost(ctx, domain)
+			hasDNS = (dnsErr == nil)
+			done <- true
+		}()
+
+		select {
+		case <-done:
+			cancel()
+			if hasDNS {
+				// Success - cache the result for 24 hours
+				e.dnsCacheMutex.Lock()
+				e.dnsCache[domain] = true
+				e.dnsCacheExpiry[domain] = time.Now().Add(24 * time.Hour)
+				e.dnsCacheMutex.Unlock()
+				return true
+			}
+			// DNS lookup failed but didn't timeout - check if we should retry
+			// Only retry on timeout errors or temporary network errors
+			if attempt < maxRetries {
+				// Check if error suggests a retry might help (timeout, temporary network error)
+				errStr := dnsErr.Error()
+				if strings.Contains(errStr, "timeout") || strings.Contains(errStr, "temporary") ||
+					strings.Contains(errStr, "network") || strings.Contains(errStr, "no such host") {
+					// Exponential backoff: 0.5s, 1s, 2s
+					backoff := time.Duration(attempt*500) * time.Millisecond
+					time.Sleep(backoff)
+					continue // Retry
+				}
+			}
+			// Permanent failure or no more retries - cache negative result
+			e.dnsCacheMutex.Lock()
+			e.dnsCache[domain] = false
+			e.dnsCacheExpiry[domain] = time.Now().Add(1 * time.Hour) // Shorter cache for failures
+			e.dnsCacheMutex.Unlock()
+			return false
+
+		case <-ctx.Done():
+			cancel()
+			// Timeout - retry if attempts remaining
+			if attempt < maxRetries {
+				// Exponential backoff: 0.5s, 1s, 2s
+				backoff := time.Duration(attempt*500) * time.Millisecond
+				time.Sleep(backoff)
+				continue // Retry
+			}
+			// All retries exhausted - cache negative result
+			e.dnsCacheMutex.Lock()
+			e.dnsCache[domain] = false
+			e.dnsCacheExpiry[domain] = time.Now().Add(1 * time.Hour) // Shorter cache for failures
+			e.dnsCacheMutex.Unlock()
+			return false
+		}
 	}
+
+	// Should never reach here, but handle edge case
+	e.dnsCacheMutex.Lock()
+	e.dnsCache[domain] = false
+	e.dnsCacheExpiry[domain] = time.Now().Add(1 * time.Hour)
+	e.dnsCacheMutex.Unlock()
+	return false
 }
 
 // createHTTPClient creates an HTTP client with custom DNS resolver and optimized settings
