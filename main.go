@@ -109,6 +109,8 @@ type EmailExtractor struct {
 	processedDomains   int
 	successfulDomains  int
 	failedDomains      int
+	unresolvedDomains  int // DNS/connection failures
+	noEmailDomains     int // Resolved but no emails found
 	totalEmailsFound   int64 // Total emails extracted across all domains
 	totalPhonesFound   int64 // Total phone numbers extracted
 	cloudflareBlocked  int64 // Domains blocked by Cloudflare
@@ -1969,8 +1971,8 @@ func (sv *SmartValidation) hasMXRecord(domain string) bool {
 						if !strings.HasPrefix(mxHost, "localhost") &&
 							!strings.HasPrefix(mxHost, "127.") &&
 							!strings.HasPrefix(mxHost, "0.") {
-							hasMX = true
-							break
+					hasMX = true
+					break
 						}
 					}
 				}
@@ -2552,8 +2554,8 @@ func (e *EmailExtractor) SaveCategorizedEmails(categorizedEmails map[string][]st
 
 		// Create category-specific output file
 		outputPath := fmt.Sprintf("%s/categorized_%s.txt", e.config.OutputDirectory, category)
-		file, err := os.OpenFile(outputPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
+	file, err := os.OpenFile(outputPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
 			log.Printf("Failed to open category file for %s: %v", category, err)
 			continue
 		}
@@ -3619,22 +3621,36 @@ func (e *EmailExtractor) requestShutdown() {
 	e.shutdownRequested = true
 }
 
-func (e *EmailExtractor) updateProgress(success bool) {
+// DomainResult represents different outcomes for domain processing
+type DomainResult int
+
+const (
+	DomainSuccess DomainResult = iota // Emails found
+	DomainUnresolved                  // DNS/connection failure
+	DomainNoEmail                     // Resolved but no emails found
+)
+
+func (e *EmailExtractor) updateProgress(result DomainResult) {
 	e.progressMutex.Lock()
 	defer e.progressMutex.Unlock()
 	e.processedDomains++
-	if success {
+	switch result {
+	case DomainSuccess:
 		e.successfulDomains++
-	} else {
-		e.failedDomains++
+	case DomainUnresolved:
+		e.unresolvedDomains++
+		e.failedDomains++ // Keep for backward compatibility
+	case DomainNoEmail:
+		e.noEmailDomains++
+		e.failedDomains++ // Keep for backward compatibility
 	}
 }
 
-func (e *EmailExtractor) getProgress() (processed, total, success, failed int, elapsed time.Duration) {
+func (e *EmailExtractor) getProgress() (processed, total, success, failed, unresolved, noEmail int, elapsed time.Duration) {
 	e.progressMutex.RLock()
 	defer e.progressMutex.RUnlock()
 	elapsed = time.Since(e.startTime)
-	return e.processedDomains, e.totalDomains, e.successfulDomains, e.failedDomains, elapsed
+	return e.processedDomains, e.totalDomains, e.successfulDomains, e.failedDomains, e.unresolvedDomains, e.noEmailDomains, elapsed
 }
 
 func (e *EmailExtractor) displayProgress() {
@@ -3645,14 +3661,13 @@ func (e *EmailExtractor) displayProgress() {
 	}
 	e.lastProgressUpdate = now
 
-	processed, total, success, failed, elapsed := e.getProgress()
+	processed, total, success, _, unresolved, noEmail, elapsed := e.getProgress()
 	if total == 0 {
 		return
 	}
 
 	e.progressMutex.RLock()
 	totalEmails := e.totalEmailsFound
-	totalPhones := e.totalPhonesFound
 	cloudflareCount := e.cloudflareBlocked
 	e.progressMutex.RUnlock()
 
@@ -3679,8 +3694,9 @@ func (e *EmailExtractor) displayProgress() {
 	// Print progress on its own line, overwriting previous progress
 	// Use \033[2K to clear entire line, \r to return to start, then print new progress
 	// This ensures progress doesn't overwrite log messages
-	fmt.Printf("\r\033[2K📊 [%s] %.1f%% | 📧 %d emails | 📞 %d phones | ✅ %d (%.1f%%) | ❌ %d | 🔒 CF:%d | ⚡ %.1f/s | ⏱️  ETA: %s",
-		bar, percentage, totalEmails, totalPhones, success, successRate, failed, cloudflareCount, rate, formatDuration(eta))
+	// Show breakdown: ✅ emails found | 🌐 resolved (no emails) | ❌ unresolved
+	fmt.Printf("\r\033[2K📊 [%s] %.1f%% | 📧 %d emails | ✅ %d (%.1f%%) | 🌐 %d (no emails) | ❌ %d (unresolved) | 🔒 CF:%d | ⚡ %.1f/s | ⏱️  ETA: %s",
+		bar, percentage, totalEmails, success, successRate, noEmail, unresolved, cloudflareCount, rate, formatDuration(eta))
 }
 
 func formatDuration(d time.Duration) string {
@@ -3711,9 +3727,9 @@ func (e *EmailExtractor) StartExtractionWithConfirmation(skipConfirmation bool) 
 		}
 	} else {
 		// Legacy mode: load all domains into memory
-		domains, err := e.LoadDomains()
-		if err != nil {
-			log.Fatalf("Failed to load domains: %v", err)
+	domains, err := e.LoadDomains()
+	if err != nil {
+		log.Fatalf("Failed to load domains: %v", err)
 		}
 		totalDomains = len(domains)
 		// Display summary with loaded domains
@@ -3726,6 +3742,8 @@ func (e *EmailExtractor) StartExtractionWithConfirmation(skipConfirmation bool) 
 	e.processedDomains = 0
 	e.successfulDomains = 0
 	e.failedDomains = 0
+	e.unresolvedDomains = 0
+	e.noEmailDomains = 0
 	e.totalEmailsFound = 0
 	e.totalPhonesFound = 0
 	e.cloudflareBlocked = 0
@@ -3772,8 +3790,8 @@ func (e *EmailExtractor) StartExtractionWithConfirmation(skipConfirmation bool) 
 					return
 				}
 
-				success := e.ProcessDomain(domain)
-				e.updateProgress(success)
+				result := e.ProcessDomain(domain)
+				e.updateProgress(result)
 			}
 		}()
 	}
@@ -3814,12 +3832,12 @@ func (e *EmailExtractor) StartExtractionWithConfirmation(skipConfirmation bool) 
 		}
 		go func() {
 			defer close(domainQueue)
-			for _, domain := range domains {
+	for _, domain := range domains {
 				if e.isShutdownRequested() {
 					return
 				}
-				domainQueue <- domain
-			}
+		domainQueue <- domain
+	}
 		}()
 	}
 
@@ -3831,12 +3849,11 @@ func (e *EmailExtractor) StartExtractionWithConfirmation(skipConfirmation bool) 
 
 	// Final progress display with enhanced statistics
 	fmt.Println() // New line after progress
-	processed, total, success, failed, elapsed := e.getProgress()
+	processed, total, success, _, unresolved, noEmail, elapsed := e.getProgress()
 
 	// Get final statistics
 	e.progressMutex.RLock()
 	totalEmails := e.totalEmailsFound
-	totalPhones := e.totalPhonesFound
 	cloudflareCount := e.cloudflareBlocked
 	e.progressMutex.RUnlock()
 
@@ -3859,9 +3876,8 @@ func (e *EmailExtractor) StartExtractionWithConfirmation(skipConfirmation bool) 
 		fmt.Printf("⚠️  EXTRACTION INTERRUPTED\n")
 		fmt.Println(strings.Repeat("=", 80))
 		fmt.Printf("📊 Progress: %d/%d domains processed (%.1f%%)\n", processed, total, float64(processed)*100.0/float64(total))
-		fmt.Printf("✅ Successful: %d (%.1f%%) | ❌ Failed: %d\n", success, successRate, failed)
+		fmt.Printf("✅ Successful: %d (%.1f%%) | 🌐 No Emails: %d | ❌ Unresolved: %d\n", success, successRate, noEmail, unresolved)
 		fmt.Printf("📧 Total Emails Extracted: %d (avg: %.1f per successful domain)\n", totalEmails, avgEmailsPerDomain)
-		fmt.Printf("📞 Total Phone Numbers: %d\n", totalPhones)
 		if cloudflareCount > 0 {
 			fmt.Printf("🔒 Cloudflare Blocked: %d domains\n", cloudflareCount)
 		}
@@ -3873,10 +3889,9 @@ func (e *EmailExtractor) StartExtractionWithConfirmation(skipConfirmation bool) 
 		fmt.Printf("✅ EXTRACTION COMPLETE\n")
 		fmt.Println(strings.Repeat("=", 80))
 		fmt.Printf("📊 Total Domains: %d\n", total)
-		fmt.Printf("✅ Successful: %d (%.1f%%) | ❌ Failed: %d (%.1f%%)\n",
-			success, successRate, failed, float64(failed)*100.0/float64(processed))
+		fmt.Printf("✅ Successful: %d (%.1f%%) | 🌐 No Emails: %d (%.1f%%) | ❌ Unresolved: %d (%.1f%%)\n",
+			success, successRate, noEmail, float64(noEmail)*100.0/float64(processed), unresolved, float64(unresolved)*100.0/float64(processed))
 		fmt.Printf("📧 Total Emails Extracted: %d (avg: %.1f per successful domain)\n", totalEmails, avgEmailsPerDomain)
-		fmt.Printf("📞 Total Phone Numbers: %d\n", totalPhones)
 		if cloudflareCount > 0 {
 			fmt.Printf("🔒 Cloudflare Blocked: %d domains\n", cloudflareCount)
 		}
@@ -3886,22 +3901,22 @@ func (e *EmailExtractor) StartExtractionWithConfirmation(skipConfirmation bool) 
 	}
 }
 
-// ProcessDomain processes a single domain and returns true if successful
-func (e *EmailExtractor) ProcessDomain(domain string) bool {
+// ProcessDomain processes a single domain and returns DomainResult
+func (e *EmailExtractor) ProcessDomain(domain string) DomainResult {
 	var emails []string
 
 	// Fast DNS pre-check: Skip domains without valid DNS (optimization)
 	if !e.fastDNSCheck(domain) {
 		// Domain logged to unresolved domains file, no console output needed
 		e.LogDomain(domain, e.config.LogUnresolvedDomains)
-		return false
+		return DomainUnresolved
 	}
 
 	homepageURL := fmt.Sprintf("https://%s", domain)
 	if e.HasBadExtension(homepageURL) {
 		// Domain logged to unresolved domains file, no console output needed
 		e.LogDomain(domain, e.config.LogUnresolvedDomains)
-		return false
+		return DomainUnresolved
 	}
 
 	// Try HTTPS first
@@ -3913,7 +3928,7 @@ func (e *EmailExtractor) ProcessDomain(domain string) bool {
 		if err != nil {
 			// Error details logged to unresolved domains file, no console output needed
 			e.LogDomain(domain, e.config.LogUnresolvedDomains)
-			return false
+			return DomainUnresolved
 		}
 	}
 
@@ -3942,7 +3957,7 @@ func (e *EmailExtractor) ProcessDomain(domain string) bool {
 
 	// Log resolved domains (successfully fetched, regardless of email count)
 	// A domain is "resolved" if we successfully fetched it, even if no emails were found
-	e.LogDomain(domain, e.config.LogResolvedDomains)
+		e.LogDomain(domain, e.config.LogResolvedDomains)
 
 	// Update email statistics
 	e.progressMutex.Lock()
@@ -3952,7 +3967,10 @@ func (e *EmailExtractor) ProcessDomain(domain string) bool {
 	// Domain result details are already shown in progress bar
 	// No need to print individual domain results to avoid clutter
 
-	return len(emails) > 0
+	if len(emails) > 0 {
+		return DomainSuccess
+	}
+	return DomainNoEmail
 }
 
 // getRejectionReason determines why an email was rejected by validation
@@ -4213,7 +4231,7 @@ func (e *EmailExtractor) TestDomain(domainOrURL string) {
 	for _, email := range allFoundEmails {
 		if smartValidation.ValidateEmail(email) {
 			validEmails = append(validEmails, email)
-		} else {
+	} else {
 			rejectedEmails = append(rejectedEmails, email)
 			reason := e.getRejectionReason(email, smartValidation)
 			rejectionReasons = append(rejectionReasons, reason)
