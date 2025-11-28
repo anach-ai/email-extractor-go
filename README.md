@@ -38,8 +38,10 @@ A powerful, production-ready Go-based tool for extracting email addresses from w
 
 2. **Install dependencies:**
    ```bash
-   go mod download
+   go mod tidy
    ```
+   
+   This will download all dependencies and generate the `go.sum` file.
 
 3. **Run the extractor:**
    ```bash

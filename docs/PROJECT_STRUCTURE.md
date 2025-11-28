@@ -91,7 +91,7 @@ email-extractor.go.v1.2/
 
 - **`config.json`** - Application configuration (concurrency, timeouts, paths)
 - **`go.mod`** - Go module dependencies
-- **`go.sum`** - Dependency checksums (auto-generated on `go mod download`)
+- **`go.sum`** - Dependency checksums (auto-generated on `go mod tidy`)
 
 ### Documentation
 

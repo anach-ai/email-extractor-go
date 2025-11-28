@@ -85,10 +85,10 @@ cd email-extractor.go.v1.2
 ## Step 4: Install Dependencies
 
 ```bash
-go mod download
+go mod tidy
 ```
 
-This will automatically generate `go.sum` file.
+This will download all dependencies and generate the `go.sum` file.
 
 ---
 
