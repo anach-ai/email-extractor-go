@@ -36,3 +36,6 @@ vendor/
 # Private documentation (internal docs - not for public GitHub)
 private-docs/
 
+# Utility scripts (local development only)
+scripts/
+

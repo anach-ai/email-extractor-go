@@ -57,12 +57,6 @@ email-extractor.go.v1.2/
 │       ├── categorized_*.txt            # Categorized emails
 │       └── email_categories_summary.txt # Category summary
 │
-├── 🛠️ Utility Scripts
-│   └── scripts/                         # Helper scripts
-│       ├── install_tesseract.bat        # Tesseract installer
-│       ├── verify_tesseract.bat         # Tesseract verifier
-│       └── ... (other utility scripts)
-│
 └── 🔧 GitHub Templates
     └── .github/
         └── ISSUE_TEMPLATE/
@@ -134,7 +128,6 @@ Telegram: @dranach
 - **Source Files**: 4 Go files
 - **Data Files**: 7 data files
 - **Documentation**: 5 files in docs/
-- **Scripts**: 11 utility scripts
 
 ---
 
