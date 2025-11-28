@@ -39,3 +39,10 @@ private-docs/
 # Utility scripts (local development only)
 scripts/
 
+# GitHub setup helper files (one-time use, not needed in repository)
+GITHUB_NEXT_STEPS.md
+GITHUB_SETUP.md
+PUSH_INSTRUCTIONS.md
+PUSH_NOW.md
+REPOSITORY_DESCRIPTION.txt
+
