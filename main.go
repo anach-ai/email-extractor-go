@@ -3686,8 +3686,8 @@ func (e *EmailExtractor) displayProgress() {
 		successRate = float64(success) * 100.0 / float64(processed)
 	}
 
-	// Create progress bar (50 characters)
-	barWidth := 50
+	// Create progress bar (30 characters)
+	barWidth := 30
 	filled := int(percentage / 100.0 * float64(barWidth))
 	bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
 
