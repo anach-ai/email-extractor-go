@@ -1,0 +1,14 @@
+# Email Categorization Patterns
+# Format: category|pattern1|pattern2|pattern3
+# Categories: general, sales, support, admin, marketing, technical, finance, hr, legal, operations
+
+general|info|contact|inquiry|general|hello|main|office|mail|email|reach|enquiry|request|get|ask|question
+sales|sales|sell|order|purchase|buy|quote|pricing|quote|business|commercial|revenue|account|manager|executive|bd|bizdev|businessdev|deals|contract|negotiate|partnership|merchant|vendor|reseller|distributor
+support|support|help|assist|troubleshoot|issue|problem|service|customer|care|service|helpdesk|desk|ticket|incident|escalate|resolve|fix|repair|maintenance|technical|support|qa|quality|testing
+admin|admin|administrator|management|manager|executive|director|ceo|founder|owner|president|vicepresident|vp|cfo|cto|coo|president|principal|partner|board|chairman|secretary|treasurer|operations|ops
+marketing|marketing|promotion|advertise|newsletter|subscribe|pr|public|media|social|content|blog|editor|writer|journalist|press|outreach|community|growth|brand|branding|creative|design|graphic|video|photography
+technical|tech|technical|it|developer|dev|engineer|sysadmin|system|server|hosting|webmaster|network|security|infrastructure|devops|sre|qa|quality|testing|automation|programming|coding|software|hardware|database|dba|backend|frontend|fullstack|mobile|ios|android|architect|scrum|agile|solutions|integration
+finance|finance|financial|accounting|accountant|billing|invoice|payment|payable|receivable|bookkeeping|audit|tax|taxes|payroll|treasurer|controller|accounts|payments|transactions|revenue|cost|budget|expense|refund|credit|debit|banking
+hr|hr|human|recruit|recruitment|jobs|career|hiring|employment|personnel|staff|talent|people|culture|employee|benefits|compensation|payroll|training|learning|development|onboarding|retention|engagement|diversity|inclusion|wellness
+legal|legal|law|attorney|lawyer|counsel|compliance|regulatory|contract|litigation|intellectual|property|patent|trademark|copyright|privacy|gdpr|terms|conditions|license|permit|certification|notary|paralegal|secretary|clerk
+operations|operations|ops|logistics|supply|chain|procurement|vendor|purchasing|warehouse|inventory|shipping|delivery|distribution|fleet|facilities|facility|maintenance|security|safety|health|environment|quality|production|manufacturing|plant|factory|floor

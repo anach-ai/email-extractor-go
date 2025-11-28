@@ -1,0 +1,38 @@
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Output files
+output/*.txt
+output/*.log
+output/temp_*
+
+# Test files
+test_*.txt
+test_*.bat
+test_*.ps1
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Go specific
+vendor/
+
+# Private documentation (internal docs - not for public GitHub)
+private-docs/
+
