@@ -60,7 +60,7 @@ The tool will:
 
 ## 📖 Full Guide
 
-For detailed instructions, see: `private-docs/WINDOWS_SETUP_GUIDE.md`
+For detailed instructions, see: `docs/INSTALLATION.md`
 
 ---
 

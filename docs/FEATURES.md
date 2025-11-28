@@ -36,8 +36,12 @@ Comprehensive list of Email Extractor features.
 
 - **Concurrent Processing** - Parallel domain processing
 - **Auto-Optimization** - Automatically optimizes settings based on system
+  - **`machine.go` utility**: Analyzes CPU, memory, and network to auto-tune performance
+  - Optimizes concurrency, rate limits, timeouts, and batch sizes automatically
+  - No manual configuration needed - adapts to any hardware
 - **Rate Limiting** - Configurable request rate limiting
 - **DNS Caching** - Fast DNS pre-checks with caching
+- **Distributed Processing** - Framework for Redis-based horizontal scaling (optional utility)
 
 ### 🔒 Advanced Features
 

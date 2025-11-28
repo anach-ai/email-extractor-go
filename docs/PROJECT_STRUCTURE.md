@@ -33,13 +33,6 @@ email-extractor.go.v1.2/
 │       ├── CHANGELOG.md                 # Version history
 │       └── PROJECT_STRUCTURE.md         # This file
 │
-├── 🔒 Private Documentation
-│   └── private-docs/                    # Internal/development docs (60+ files)
-│       ├── WINDOWS_SETUP_GUIDE.md
-│       ├── DATA_FILES_ANALYSIS.md
-│       ├── PERFORMANCE_ANALYSIS.md
-│       └── ... (other internal docs)
-│
 ├── 📊 Data Files
 │   └── data/                            # Filter and configuration data
 │       ├── user_agents.txt              # 63 modern user agents (2025)
@@ -85,8 +78,20 @@ email-extractor.go.v1.2/
 
 - **`main.go`** - Main application logic, HTTP client, email extraction
 - **`ocr_extraction.go`** - OCR functionality for image email extraction
-- **`machine.go`** - System performance analysis and auto-optimization
-- **`distributed_processing.go`** - Distributed processing logic
+
+### Utility Modules
+
+- **`machine.go`** - **Performance Optimization Utility**
+  - Automatically analyzes system resources (CPU, memory, network)
+  - Optimizes concurrency, rate limits, timeouts based on hardware
+  - Adjusts batch sizes and delays for optimal performance
+  - Ensures best performance on any system without manual tuning
+
+- **`distributed_processing.go`** - **Distributed Processing Utility**
+  - Framework for Redis-based distributed processing
+  - Enables horizontal scaling across multiple workers
+  - Queue-based job distribution (future feature)
+  - Currently disabled by default (set `distributed_mode: true` to enable)
 
 ### Configuration
 
@@ -99,7 +104,6 @@ email-extractor.go.v1.2/
 - **`README.md`** - Main project README (GitHub-friendly)
 - **`QUICK_START_WINDOWS.md`** - Quick start guide for Windows
 - **`docs/`** - Public documentation for GitHub
-- **`private-docs/`** - Internal/development documentation
 
 ---
 
@@ -129,8 +133,7 @@ Telegram: @dranach
 
 - **Source Files**: 4 Go files
 - **Data Files**: 7 data files
-- **Documentation**: 60+ files in private-docs/
-- **Public Docs**: 5 files in docs/
+- **Documentation**: 5 files in docs/
 - **Scripts**: 11 utility scripts
 
 ---

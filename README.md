@@ -107,8 +107,13 @@ go run main.go ocr_extraction.go distributed_processing.go machine.go --version
 email-extractor.go.v1.2/
 ├── main.go                          # Main application
 ├── ocr_extraction.go                # OCR functionality
-├── machine.go                       # System performance optimization
-├── distributed_processing.go        # Distributed processing logic
+│
+├── 🔧 Utility Modules
+│   ├── machine.go                   # Auto system optimization utility
+│   │   └── Analyzes CPU, memory, network & optimizes performance
+│   └── distributed_processing.go    # Distributed processing utility
+│       └── Redis-based scaling (future feature, disabled by default)
+│
 ├── config.json                      # Configuration file
 ├── go.mod                           # Go module definition
 ├── README.md                        # This file
@@ -132,13 +137,31 @@ email-extractor.go.v1.2/
 │   ├── unresolved_domains.txt       # Failed domains
 │   └── categorized_*.txt            # Categorized emails by department
 │
-├── docs/                            # GitHub-friendly documentation
-│   ├── INSTALLATION.md              # Installation guide
-│   └── USAGE.md                     # Usage guide
-│
-└── private-docs/                    # Internal documentation
-    └── ...                          # Development docs
+└── docs/                            # GitHub-friendly documentation
+    ├── INSTALLATION.md              # Installation guide
+    └── USAGE.md                     # Usage guide
 ```
+
+### Utility Modules Explained
+
+#### 🚀 `machine.go` - Auto Performance Optimization
+
+Automatically optimizes the extractor for your system:
+- **CPU Analysis**: Detects cores and usage, optimizes concurrency
+- **Memory Analysis**: Adjusts batch sizes based on available RAM
+- **Network Analysis**: Measures latency and speed, optimizes timeouts and rate limits
+- **Auto-Tuning**: No manual configuration needed - works optimally on any system
+
+**Benefits**: Best performance on your hardware without manual tweaking.
+
+#### 🔄 `distributed_processing.go` - Distributed Processing (Future)
+
+Framework for scaling across multiple machines:
+- **Redis Integration**: Queue-based job distribution
+- **Horizontal Scaling**: Process domains across multiple workers
+- **Status**: Framework ready, disabled by default (set `distributed_mode: true` in config.json to enable)
+
+**Note**: Requires Redis server. Currently a placeholder for future distributed processing needs.
 
 ---
 
@@ -203,6 +226,7 @@ Advanced detection and handling of Cloudflare-protected sites.
 - **[Quick Start Guide](QUICK_START_WINDOWS.md)** - Get started in 5 minutes
 - **[Installation Guide](docs/INSTALLATION.md)** - Detailed installation instructions
 - **[Usage Guide](docs/USAGE.md)** - Complete usage documentation
+- **[Utilities Guide](docs/UTILITIES.md)** - Utility modules explained (`machine.go`, `distributed_processing.go`)
 
 ---
 
