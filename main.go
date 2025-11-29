@@ -29,6 +29,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -435,15 +436,21 @@ func (e *EmailExtractor) LoadAdditionalFilters() error {
 
 // initializeDNSResolver sets up a custom DNS resolver with timeout for faster DNS lookups
 func (e *EmailExtractor) initializeDNSResolver() {
-	// Create custom DNS resolver with 2-3 second timeout
-	e.dnsResolver = &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			d := net.Dialer{
-				Timeout: 2 * time.Second, // Fast timeout for DNS queries
-			}
-			return d.DialContext(ctx, network, address)
-		},
+	// On Windows, use the system DNS resolver for maximum compatibility (corporate networks, VPNs, DNS-over-HTTPS, etc.)
+	// The Go pure resolver can be blocked by firewalls on some Windows setups, causing many false "unresolved" results.
+	if runtime.GOOS == "windows" {
+		e.dnsResolver = net.DefaultResolver
+	} else {
+		// On Linux/Unix, a custom resolver with a fast per-query timeout is usually safe and faster.
+		e.dnsResolver = &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				d := net.Dialer{
+					Timeout: 2 * time.Second, // Fast timeout for DNS queries
+				}
+				return d.DialContext(ctx, network, address)
+			},
+		}
 	}
 	// Initialize DNS cache
 	e.dnsCache = make(map[string]bool)
@@ -2782,13 +2789,18 @@ func (e *EmailExtractor) makeRequest(url string) (*goquery.Document, error) {
 
 	resp, err := e.httpClient.Do(req)
 	if err != nil {
+		// Connection/DNS/timeout error - domain is truly unreachable (unresolved)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("received non-200 response code: %d", resp.StatusCode)
-	}
+	// Accept any HTTP response (2xx, 3xx, 4xx, 5xx) as proof the domain exists and is accessible
+	// Only connection errors (above) mark domains as unresolved
+	// HTTP status codes mean the server responded - domain is reachable
+	// We'll process the response body regardless of status code:
+	// - 2xx: Extract emails normally
+	// - 3xx: HTTP client automatically follows redirects
+	// - 4xx/5xx: Error pages might still contain contact info, will result in DomainNoEmail (not Unresolved)
 
 	// Read the response body
 	bodyBytes, err := io.ReadAll(resp.Body)
@@ -3950,13 +3962,6 @@ func (e *EmailExtractor) StartExtractionWithConfirmation(skipConfirmation bool) 
 func (e *EmailExtractor) ProcessDomain(domain string) DomainResult {
 	var emails []string
 
-	// Fast DNS pre-check: Skip domains without valid DNS (optimization)
-	if !e.fastDNSCheck(domain) {
-		// Domain logged to unresolved domains file, no console output needed
-		e.LogDomain(domain, e.config.LogUnresolvedDomains)
-		return DomainUnresolved
-	}
-
 	homepageURL := fmt.Sprintf("https://%s", domain)
 	if e.HasBadExtension(homepageURL) {
 		// Domain logged to unresolved domains file, no console output needed
@@ -3964,14 +3969,16 @@ func (e *EmailExtractor) ProcessDomain(domain string) DomainResult {
 		return DomainUnresolved
 	}
 
-	// Try HTTPS first
+	// Try HTTPS first - HTTP request will naturally detect if domain is accessible
+	// No DNS pre-check needed - if HTTP fails, domain is not accessible
 	doc, err := e.FetchURL(homepageURL)
 	if err != nil {
 		// Try HTTP as fallback
 		homepageURL = fmt.Sprintf("http://%s", domain)
 		doc, err = e.FetchURL(homepageURL)
 		if err != nil {
-			// Error details logged to unresolved domains file, no console output needed
+			// HTTP request failed - domain is not accessible via HTTP
+			// This is the most reliable way to detect accessibility (works even if DNS differs between systems)
 			e.LogDomain(domain, e.config.LogUnresolvedDomains)
 			return DomainUnresolved
 		}
